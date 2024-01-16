@@ -23,6 +23,28 @@ class KnowlageBase:
         self.flage_in_danger = False
         self.dangerous_location = []
         self.all_enemy_location = []
+        self.defend_cooldown = 200
+        self.agent0_action = None
+        self.agent1_action = None
+        self.agent2_action = None
+
+    def update_agent_action(self, agent, action):
+        match agent:
+            case 0:
+                self.agent0_action = action
+            case 1:
+                self.agent1_action = action
+            case 2:
+                self.agent2_action = action
+
+    def get_agent_action(self, agent):
+        match agent:
+            case 0:
+                return self.agent0_action
+            case 1:
+                return self.agent1_action
+            case 2:
+                return self.agent2_action
 
     def agent_died(self, agent):
         match agent:
@@ -47,7 +69,7 @@ class KnowlageBase:
     def refresh_enemys(self):
         for row in range(len(self.knowlage_base)):
             for col in range(len(self.knowlage_base[row])):
-                if self.knowlage_base[row][col] in self.enemy:
+                if self.knowlage_base[row][col] in [self.enemy, '.']:
                     self.knowlage_base[row][col] = ' '
 
     def find_dangerous_location(self, agent_pos_row, agent_pos_col):

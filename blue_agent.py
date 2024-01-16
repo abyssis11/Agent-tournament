@@ -159,7 +159,7 @@ class Agent:
         pass
 
     def regrup(self, agent_pos_row, agent_pos_col, position, pathfinding_world, all_enemys):
-        direction = pathfinding_direction((agent_pos_row, agent_pos_col), (position[0], position[1]), pathfinding_world, all_enemys)
+        direction = pathfinding_direction((agent_pos_row, agent_pos_col), position, pathfinding_world, all_enemys)
         action = "move"
         return action, direction
 

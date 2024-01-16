@@ -6,7 +6,6 @@ import time
 import random
 import copy
 
-
 class World:
 
     def __init__(self, height, width, tick_rate):
