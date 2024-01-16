@@ -3,7 +3,7 @@ import math
 
 
 EMPTY_STEP_COST = 1
-MUD_STEP_COST = 10
+MUD_STEP_COST = 10 # 10
 FEAR_OF_UNKNOWN = 6.66
 UNKNOWN_STEP_COST = max(EMPTY_STEP_COST, MUD_STEP_COST) * FEAR_OF_UNKNOWN  # for unknown positions (not visible)
 FEAR_OF_ENEMY = 10
