@@ -83,6 +83,7 @@ class KnowlageBase:
                         self.knowlage_base[row][col] = current_vision[current_vision_row][current_vision_col]
                         if current_vision[current_vision_row][current_vision_col] == self.enemy[0]:
                             self.all_enemy_location.append((row, col))
+                            
                         #      -1 -> unknown (/)
                         #       0 -> empty space (" ")
                         #       1 -> obstacle (#)

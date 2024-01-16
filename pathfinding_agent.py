@@ -11,7 +11,7 @@ FEAR_OF_ENEMY = 10
 
 # Function to find the shortest path from agent_pos to target_pos on the given grid,
 #   and return direction in which the agent should move
-def pathfinding_direction(agent_pos, target_pos, grid):
+def pathfinding_direction(agent_pos, target_pos, grid, enemy_pos = (None, None)):
     # args:
     #   agent_pos (tuple): agent coordinates
     #   target_pos (tuple): target coordinates
@@ -25,7 +25,7 @@ def pathfinding_direction(agent_pos, target_pos, grid):
     #   direction: direction in which the agent will move, such as 'RIGHT', 'LEFT', 'UP', or 'DOWN'
     #   shortest_path: a list of coordinates (tuples) for visualization of the path, such as [(1, 3), (2, 3), ...]
     
-    shortest_path = astar(agent_pos, target_pos, (None, None), grid)
+    shortest_path = astar(agent_pos, target_pos, enemy_pos, grid)
     direction = get_direction(agent_pos, shortest_path)
     return direction
 
@@ -108,11 +108,16 @@ def astar(agent_pos, target_pos, enemy_pos, grid):
                    tentative_g_cost += UNKNOWN_STEP_COST
 
                if neighbor not in g_cost or tentative_g_cost < g_cost[neighbor]:
-                   g_cost[neighbor] = tentative_g_cost
-                   #total_cost = tentative_g_cost + heuristic(neighbor, goal) + fear_of_enemy(neighbor, enemy_pos)
-                   total_cost = tentative_g_cost + heuristic(neighbor, goal)
-                   heapq.heappush(open_set, (total_cost, neighbor))
-                   came_from[neighbor] = current
+                    g_cost[neighbor] = tentative_g_cost
+                    if enemy_pos == (None, None):
+                        total_cost = tentative_g_cost + heuristic(neighbor, goal)
+                    else:
+                        total_fear_of_enemy = 0
+                        for enemy in enemy_pos:
+                            total_fear_of_enemy += fear_of_enemy(neighbor, enemy)
+                        total_cost = tentative_g_cost + heuristic(neighbor, goal) + total_fear_of_enemy
+                    heapq.heappush(open_set, (total_cost, neighbor))
+                    came_from[neighbor] = current
 
     # If the goal is not reached, return an empty path
     return []  # Target not reachable
@@ -153,7 +158,7 @@ def fear_of_enemy(current, enemy):
     dist = heuristic(current, enemy)
     if dist > FEAR_OF_ENEMY:
         return 0
-    multiplier = FEAR_OF_ENEMY / ((dist +1))
+    multiplier = FEAR_OF_ENEMY / ((dist + 1))
     return  multiplier * FEAR_OF_ENEMY *1000
 
 
