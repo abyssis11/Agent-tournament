@@ -1,4 +1,4 @@
-from blue_agent2 import Agent as B_agent
+from blue_agent import Agent as B_agent
 from red_agent import Agent as R_agent
 from config import *
 

@@ -50,6 +50,7 @@ class Agent:
         self.up_corner_visited = False
         self.down_corner_visited = False
         self.waypoint = None
+        self.holding_flag = False
 
     def shoot(self, agent_pos_row, agent_pos_col, enemys):
         action = None
@@ -67,7 +68,6 @@ class Agent:
                 else:
                     action = "shoot"
                     direction = "up"
-
             elif enemy_row - agent_pos_row == 0 and distance < closest_enemy:
                 closest_enemy = distance
                 if agent_pos_col < enemy_col:
@@ -158,34 +158,11 @@ class Agent:
                     direction = pathfinding_direction((agent_pos_row, agent_pos_col), self.waypoint, pathfinding_world, all_enemys)
 
         return action, direction
-        
-    def push_for_flag(self, agent_pos_row, agent_pos_col, flag, pathfinding_world, all_enemys):
-        action = "move"
-        direction = pathfinding_direction((agent_pos_row, agent_pos_col), flag, pathfinding_world, all_enemys)
-        return action, direction
 
-    # VISAK
-    def return_flag(self, agent_pos_row, agent_pos_col, flag, pathfinding_world, all_enemys):
-        direction = pathfinding_direction((agent_pos_row, agent_pos_col), flag, pathfinding_world, all_enemys)
+    def go_to_position(self, agent_pos_row, agent_pos_col, position, pathfinding_world, all_enemys):
+        direction = pathfinding_direction((agent_pos_row, agent_pos_col), position, pathfinding_world, all_enemys)
         action = "move"
         return action, direction
-
-    def avoid(self, agemt_pos_row, agent_pos_col, current_vision):
-        pass
-
-    def attack(self):
-        pass
-    def split_up(self):
-        pass
-
-    def regrup(self, agent_pos_row, agent_pos_col, position, pathfinding_world, all_enemys):
-        direction = pathfinding_direction((agent_pos_row, agent_pos_col), (position[0], position[1]), pathfinding_world, all_enemys)
-        action = "move"
-        return action, direction
-
-    def cover(self):
-        pass
-
     
     # called every "agent frame"
     def update(self, visible_world, position, can_shoot, holding_flag):
@@ -197,6 +174,7 @@ class Agent:
         direction = None
 
         if holding_flag:
+            self.holding_flag = True
             knowlage_base.holding_flag = True
             knowlage_base.enable_flag_return()
             print("Holding flag")
@@ -206,13 +184,11 @@ class Agent:
 
         knowlage_base.update_general_knowlage_base(self.visible_range, agent_pos_row, agent_pos_col, visible_world)
         knowlage_base.find_dangerous_location(agent_pos_row, agent_pos_col)
-        knowlage_base.holding_flag = holding_flag
         
         # VARS - KNOWLAGE BASE
         pathfinding_world = knowlage_base.pathfinding_world
         friendly_flag = knowlage_base.friendly_flag_location
         enemy_flag = knowlage_base.enemy_flag_location
-        regrup_spot = knowlage_base.regrup_spot
         regruped = knowlage_base.regruped
         close_bullets = knowlage_base.bullet_locations(agent_pos_row, agent_pos_col)
         close_enemys = knowlage_base.enemy_locations(agent_pos_row, agent_pos_col)
@@ -222,7 +198,7 @@ class Agent:
         attacker2_alive = knowlage_base.attack_agent2
         defend_cooldown = knowlage_base.defend_cooldown
 
-        if  defend_cooldown <= 0:
+        if defend_cooldown <= 0:
             knowlage_base.flage_in_danger = False
 
         # CONDTIONS
@@ -230,12 +206,14 @@ class Agent:
         shoot_action = len(close_enemys) > 0 and can_shoot
         defend_flag_action = friendly_flag != None
         regrup_action = enemy_flag != None and not holding_flag and not regruped and attacker1_alive and attacker2_alive
-        push_for_flag_action = enemy_flag != None and not holding_flag and (regruped or not attacker1_alive or not attacker2_alive)
+        push_for_flag_action = enemy_flag != None and not knowlage_base.holding_flag and (regruped or not attacker1_alive or not attacker2_alive)
         search_action = enemy_flag == None and (not self.up_corner_visited or not self.down_corner_visited) and not holding_flag
         defender_attack_action = not attacker1_alive and not attacker2_alive and enemy_flag != None
         return_flag_action = attacker1_alive and attacker2_alive and knowlage_base.holding_flag
         flage_in_danger_action = knowlage_base.flage_in_danger
-        change_defender_action = not knowlage_base.flage_in_danger and defend_cooldown  <= 0 and attacker1_alive and attacker2_alive  
+        change_defender_action = not knowlage_base.flage_in_danger and defend_cooldown  <= 0 and attacker1_alive and attacker2_alive
+        cover_action = knowlage_base.holding_flag and not self.holding_flag and not flage_in_danger_action and attacker1_alive and attacker2_alive
+        wait_for_enemy_action = knowlage_base.holding_flag and not self.holding_flag and flage_in_danger_action
 
         # AGENT 0 - DEFENDER
         if self.index == 0:
@@ -246,7 +224,7 @@ class Agent:
 
             if defender_attack_action:
                 knowlage_base.update_agent_action(self.index, "defender_attack_action")
-                action, direction = self.push_for_flag(agent_pos_row, agent_pos_col, enemy_flag, pathfinding_world, all_enemys)
+                action, direction = self.go_to_position(agent_pos_row, agent_pos_col, enemy_flag, pathfinding_world, all_enemys)
 
             elif defend_flag_action:    
                 knowlage_base.update_agent_action(self.index, "defend_flag_action")         
@@ -266,13 +244,23 @@ class Agent:
 
             elif regrup_action:
                 knowlage_base.update_agent_action(self.index, "regrup_action")
-                action, direction = self.push_for_flag(agent_pos_row, agent_pos_col, regrup_spot, pathfinding_world, all_enemys)
-                if (agent_pos_row, agent_pos_col) == regrup_spot:
-                    knowlage_base.at_positon()
+                if knowlage_base.regrup_spot == None:
+                    knowlage_base.find_regrup_spot(enemy_flag)
+                action, direction = self.go_to_position(agent_pos_row, agent_pos_col, knowlage_base.regrup_spot, pathfinding_world, all_enemys)
+                if (agent_pos_row, agent_pos_col) == knowlage_base.regrup_spot:
+                    knowlage_base.at_positon(self.index)
 
             elif push_for_flag_action:
                 knowlage_base.update_agent_action(self.index, "push_for_flag_action")
-                action, direction = self.push_for_flag(agent_pos_row, agent_pos_col, enemy_flag, pathfinding_world, all_enemys)
+                action, direction = self.go_to_position(agent_pos_row, agent_pos_col, enemy_flag, pathfinding_world, all_enemys)
+            
+            elif wait_for_enemy_action:
+                knowlage_base.update_agent_action(self.index, "wait_for_enemy_action")         
+                action, direction = self.defend_flag(agent_pos_row, agent_pos_col, enemy_flag, pathfinding_world, all_enemys)
+
+            elif cover_action:
+                knowlage_base.update_agent_action(self.index, "cover_action")
+                action, direction = self.go_to_position(agent_pos_row, agent_pos_col, friendly_flag, pathfinding_world, all_enemys)
 
 
         # AGENT 2 - ATTACKER/SCOUT
@@ -283,13 +271,25 @@ class Agent:
 
             elif regrup_action:
                 knowlage_base.update_agent_action(self.index, "regrup_action")
-                action, direction = self.push_for_flag(agent_pos_row, agent_pos_col, regrup_spot, pathfinding_world, all_enemys)
-                if (agent_pos_row, agent_pos_col) == regrup_spot:
-                    knowlage_base.at_positon()
+                if knowlage_base.regrup_spot == None:
+                    knowlage_base.find_regrup_spot(enemy_flag)
+                action, direction = self.go_to_position(agent_pos_row, agent_pos_col, knowlage_base.regrup_spot, pathfinding_world, all_enemys)
+                if (agent_pos_row, agent_pos_col) == knowlage_base.regrup_spot:
+                    knowlage_base.at_positon(self.index)
+                print(direction)
 
             elif push_for_flag_action:
                 knowlage_base.update_agent_action(self.index, "push_for_flag_action")
-                action, direction = self.push_for_flag(agent_pos_row, agent_pos_col, enemy_flag, pathfinding_world, all_enemys)
+                action, direction = self.go_to_position(agent_pos_row, agent_pos_col, enemy_flag, pathfinding_world, all_enemys)
+
+            elif wait_for_enemy_action:
+                knowlage_base.update_agent_action(self.index, "wait_for_enemy_action")         
+                action, direction = self.defend_flag(agent_pos_row, agent_pos_col, enemy_flag, pathfinding_world, all_enemys)
+
+            elif cover_action:
+                knowlage_base.update_agent_action(self.index, "cover_action")
+                action, direction = self.go_to_position(agent_pos_row, agent_pos_col, friendly_flag, pathfinding_world, all_enemys)
+
             
         # REFLEKSI - ALL AGENTS
         if dodge_action:
@@ -301,18 +301,19 @@ class Agent:
             action, direction = self.shoot(agent_pos_row, agent_pos_col, close_enemys)
 
         elif holding_flag:
-                knowlage_base.update_agent_action(self.index, "holding_flag")
-                action, direction = self.return_flag(agent_pos_row, agent_pos_col, friendly_flag, pathfinding_world, all_enemys)
+            knowlage_base.update_agent_action(self.index, "holding_flag")
+            action, direction = self.go_to_position(agent_pos_row, agent_pos_col, friendly_flag, pathfinding_world, all_enemys)
 
         elif flage_in_danger_action:
             knowlage_base.update_agent_action(self.index, "flage_in_danger_action")
             knowlage_base.defend_cooldown -= 1
-            action, direction = self.defend_flag(agent_pos_row, agent_pos_col, friendly_flag, pathfinding_world, all_enemys)
+            if enemy_flag != None and math.dist((agent_pos_row, agent_pos_col), enemy_flag ) < math.dist((agent_pos_row, agent_pos_col), friendly_flag) and not holding_flag:
+                action, direction = self.go_to_position(agent_pos_row, agent_pos_col, enemy_flag, pathfinding_world, all_enemys)
+            else:
+                action, direction = self.defend_flag(agent_pos_row, agent_pos_col, friendly_flag, pathfinding_world, all_enemys)
 
-        if self.index == 2:
+        if self.index == 2 or self.index == 1:
             print(f'Agent {self.index}: {knowlage_base.get_agent_action(self.index)}')
-
-
 
         return action, direction
     
@@ -321,6 +322,8 @@ class Agent:
     def terminate(self, reason):
         if reason == "died":
             knowlage_base.agent_died(self.index)
+            if self.holding_flag:
+                knowlage_base.holding_flag = False
             print(self.color, self.index, "died")
 
 def random_left_middle_position():

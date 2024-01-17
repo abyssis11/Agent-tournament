@@ -1,4 +1,5 @@
 from config import *
+import math
 
 class KnowlageBase:
     def __init__(self, friendly_flag, enemy_flag, enemy, friend):
@@ -14,11 +15,13 @@ class KnowlageBase:
         self.attack_agent2 = True
         self.defend_agent = True
         self.enemy_agents = 3
-        self.dodge_distance = 5
+        self.dodge_distance = 6
         self.shoot_distance = 8
         self.regrup_spot = None
+        self.reserve_regrup_spot = None
         self.regruped = False
-        self.agents_at_position = 0
+        self.agent1_at_position = False
+        self.agent2_at_position = False
         self.holding_flag = False
         self.flage_in_danger = False
         self.dangerous_location = []
@@ -27,6 +30,7 @@ class KnowlageBase:
         self.agent0_action = None
         self.agent1_action = None
         self.agent2_action = None
+        self.regrup_radius = 10
 
     def update_agent_action(self, agent, action):
         match agent:
@@ -56,26 +60,50 @@ class KnowlageBase:
             case 2:
                 self.attack_agent2 = False
 
-    def at_positon(self):
-        self.agents_at_position += 1
-        if self.agents_at_position > 1 and self.attack_agent1 and self.attack_agent2:
-            self.regruped = True
+    def at_positon(self, agent):
+        if agent == 1:
+            self.agent1_at_position = True
+        elif agent == 2:
+            self.agent2_at_position = True
 
+        if self.agent1_at_position and self.agent2_at_position :
+            self.regruped = True
+            self.agent1_at_position = False
+            self.agent2_at_position = False
 
     def enable_flag_return(self):
         self.pathfinding_world[self.friendly_flag_location[0]][self.friendly_flag_location[1]] = 0
         print("return enabled")
 
     def refresh_enemys(self):
+        enemys = []
         for row in range(len(self.knowlage_base)):
             for col in range(len(self.knowlage_base[row])):
                 if self.knowlage_base[row][col] in [self.enemy, '.']:
                     self.knowlage_base[row][col] = ' '
+                    if self.knowlage_base[row][col] == self.enemy:
+                        enemys.append((row, col))
+
+        # clear dangerous_locations
+        for enemy in enemys:
+            enemy_row = enemy[0]
+            enemy_col = enemy[1]
+
+            # Check the same row within 4 columns of the agent
+            # dangerous rows
+            for j in range(max(0, enemy_col - self.shoot_distance), min(len(self.knowlage_base[0]), enemy_col + (self.shoot_distance + 1))):
+                self.dangerous_location.remove((enemy_row, j))
+                self.pathfinding_world[enemy_row][j] = 0
+                
+            # dangerous cols
+            for i in range(max(0, enemy_row - self.shoot_distance), min(len(self.knowlage_base), enemy_row + (self.shoot_distance + 1))):
+                self.dangerous_location.remove((i, enemy_col))
+                self.pathfinding_world[i][enemy_col] = 0
 
     def find_dangerous_location(self, agent_pos_row, agent_pos_col):
         enemys = []
-        for i in range(max(0, agent_pos_row - 8), min(len(self.knowlage_base), agent_pos_row + 9)):
-            for j in range(max(0, agent_pos_col - 8), min(len(self.knowlage_base[0]), agent_pos_col + 9)):
+        for i in range(max(0, agent_pos_row - 4), min(len(self.knowlage_base), agent_pos_row + 5)):
+            for j in range(max(0, agent_pos_col - 4), min(len(self.knowlage_base[0]), agent_pos_col + 5)):
                 if self.knowlage_base[i][j] == self.enemy[0]:
                     enemys.append((i, j))
         
@@ -85,14 +113,14 @@ class KnowlageBase:
 
             # Check the same row within 4 columns of the agent
             # dangerous rows
-            for j in range(max(0, enemy_col - self.shoot_distance), min(len(self.knowlage_base[0]), enemy_col + self.shoot_distance + 1)):
-                self.dangerous_location.append((enemy_col, j))
-                #self.pathfinding_world[enemy_row][j] = 2
+            for j in range(max(0, enemy_col - self.shoot_distance), min(len(self.knowlage_base[0]), enemy_col + (self.shoot_distance + 1))):
+                self.dangerous_location.append((enemy_row, j))
+                self.pathfinding_world[enemy_row][j] = 2
                 
             # dangerous cols
-            for i in range(max(0, enemy_row - self.shoot_distance), min(len(self.knowlage_base), enemy_row + self.shoot_distance + 1)):
-                self.dangerous_location.append((i, enemy_row))
-                #self.pathfinding_world[i][enemy_col] = 2
+            for i in range(max(0, enemy_row - self.shoot_distance), min(len(self.knowlage_base), enemy_row + (self.shoot_distance + 1))):
+                self.dangerous_location.append((i, enemy_col))
+                self.pathfinding_world[i][enemy_col] = 2
 
     def update_general_knowlage_base(self, visible_range, agent_pos_row, agent_pos_col, current_vision):
         for row_offset in range(-visible_range, visible_range+1):
@@ -127,8 +155,31 @@ class KnowlageBase:
                         if current_vision[current_vision_row][current_vision_col] == self.friendly_flag:
                             self.friendly_flag_location = (row, col)
                         if (HEIGHT/2 - 8) < row < (HEIGHT/2 + 8) and (WIDTH/2 - 8) < col < (WIDTH/2 + 8) and self.regrup_spot == None:
-                            if self.pathfinding_world[row][col] == 0:
-                                    self.regrup_spot = (row, col)
+                           if self.pathfinding_world[row][col] == 0:
+                                    self.reserve_regrup_spot = (row, col)
+
+    def find_regrup_spot(self, flag):
+        self.regrup_spot = self.reserve_regrup_spot
+        center_x = flag[0]
+        center_y = flag[1]
+        offset_y_start = 0
+        offset_y_end = 0
+        if self.friend[0] == "r":
+            offset_y_start = center_y + int(self.regrup_radius/2)
+            offset_y_end =  center_y +  self.regrup_radius + 1
+        else:
+            offset_y_end = center_y - int(self.regrup_radius/2)
+            offset_y_start =  center_y - self.regrup_radius + 1
+
+        for x in range(center_x - self.regrup_radius, center_x +  self.regrup_radius + 1):
+            for y in range(offset_y_start, center_y + offset_y_end):
+                distance = math.dist(flag, (x, y))
+                if distance <= self.regrup_radius:
+                     if 0 <= x < HEIGHT and 0 <= y < WIDTH:
+                        if self.pathfinding_world[x][y] == 0:
+                            self.regrup_spot = (x, y)
+                            print(self.regrup_spot)
+                            break
 
     def enemy_locations(self, agent_pos_row, agent_pos_col):
         indices = []
