@@ -1,23 +1,47 @@
-# First name Last name
+# Deni Kernjus i Dino Ladavac
 
 """ 
-Description of the agent (approach / strategy / implementation) in short points,
-fictional example / ideas:
-- It uses the knowledge base to remember:
-     - the position where the enemy was last seen,
-     - enemy flag positions,
-     - the way to its flag.
-- I use a machine learning model that, based on what the agent sees around it, decides:
-     - in which direction the agent should take a step (or stay in place),
-     - whether and in which direction to shoot.
-- One agent always stays close to the flag while the other agents are on the attack.
-- Agents communicate with each other:
-     - position of seen enemies and in which direction they are moving,
-     - the position of the enemy flag,
-     - agent's own position,
-     - agent's own condition (is it still alive, has it taken the enemy's flag, etc.)
-- Agents prefer to maintain a distance from each other (not too close and not too far).
-- etc...
+Python file with the logic for agents in the Capture the flag game.
+The agents are separated as follows:
+- 2 agents are offensive
+- 1 agent is defensive
+
+
+Offensive logic:
+    - Goal to find the enemy flag, capture it, and bring it to its own base
+    - The agents separate at the beginning and try to visit up-and-down corners in hopes of finding the enemy flag quicker
+    - If the flag is not found, they search for it in a random right-middle position
+    - When the flag is discovered, they regroup and attack the enemy base
+    - After the flag is captured, they return to their own base
+    - If the defensive agent is killed, they decide if they become offensive or defensive according to the distance between their and the enemy flag
+    - If the enemy flag is closer, they remain offensive; otherwise, they become defensive
+    - After some time of defending their flag, one agent becomes offensive
+    - They dodge the enemy if they can otherwise, they shoot at the enemy
+    - Dodge bullets
+Defensive logic:
+    - Goal is to find our own flag and defend it
+    - When the flag is discovered, walk around it and try to find enemy agents
+    - If neraby enemy agents are discovered, shoot at them
+    - If both offensive agents die, become offensive
+    - Dodge bullets
+Agents use a pathfinding algorithm to find the best path and a shared knowledge base to share important information.
+Pathfinding:
+    - uses the A* algorithm
+    - calculates the heuristic (euclidean) distance between agent and target on unexplored tiles
+    - uses cost and heuristis distance on explored tiles
+    - Algorithm avoids walls, unexplored positions, and enemy agents if it can
+Shared knowledge base and information:
+    - Knowledge base is a mattrix (HEIGHT*WIDTH) of a map
+    - If one agent discovers some tiles, all agents can see them
+    - Agent's own position is shared
+    - Agent's action is shared
+    - Flags positions are shared
+    - Enemy agent positions are shared
+    - Regroup position is shared
+    - Agent's condition is shared (alive / dead)
+Agents shoot at enemies only if they can't avoid them (for example, if there are walls on each side).
+If the agent returns to their own base with the enemy flag and their enemy flag is taken, they wait for the enemy agent to find them because there is a higher probability of shooting at them.
+Agents are using action to declare if they are moving or shooting and direction to declare which side they are doing the action (up, down, left, right).
 """
 
 import random
@@ -49,8 +73,27 @@ class Agent:
         self.down_corner_visited = False
         self.waypoint = None
         self.holding_flag = False
+        self.random_position_counter = 0
 
     def shoot(self, agent_pos_row, agent_pos_col, enemys):
+        """
+        Functions that get the list of enemy positions, calculate the distance to them, and then shoot
+        in the direction of the closest enemy.
+
+
+        If the enemy's and agents vertical position is aligned, they shoot up or down, and if their
+        horizontal position is aligned, then shoots left or right. If none of the positions align,
+        The agent returns "None" as direction and action.
+
+        Args:
+            agent_pos_row (int): Row index of agent position in pathfinding world
+            agent_pos_col (int): Column index of agent position in pathfinding world
+            enemys (list of tuples): List of tuples (x,y) of nearby enemies positions.
+
+        Returns:
+            action (str): "shoot" as an indicator for agent to shoot
+            direction (str): ("up", "down", "left", "right") depending on enemy position 
+        """
         action = None
         direction = None
         closest_enemy = float('inf')
@@ -78,6 +121,23 @@ class Agent:
         return action, direction
 
     def dodge(self, agent_pos_row, agent_pos_col, bullets):
+        """
+        Function that gets the list of nearby bullet positions and calculates which one is the closest,
+        then moves away from it.
+        
+        If the bullet's vertical position alligns with the agent's vertical position then the agent moves
+        left or right. If the bullet's horizontal position alligns with the agent's horizontal position, then
+        the agent moves up and down. 
+
+        Args:
+            agent_pos_row (int): Row index of agent position in pathfinding world
+            agent_pos_col (int): Column index of agent position in pathfinding world
+            bullets (list of tuples): List of positions (x,y) of nearby enemies
+
+        Returns:
+            action (str) : "move" as an indicator for agent to move
+            direction (str) : "up","down","left" or "right" for the direction to move away of the bullet
+        """
         action = None
         direction = None
         closest_bullet = float('inf')
@@ -105,6 +165,23 @@ class Agent:
         return action, direction
 
     def defend_flag(self, agent_pos_row, agent_pos_col, flag, pathfinding_world, all_enemys):
+        """
+        Function that is used to position the agent in the defending position of its own flag.
+        Calculates the path to own flag and gets the direction where to move according to the path
+
+        Args:
+            agent_pos_row (int): Row index of agent position in pathfinding world
+            agent_pos_col (int): Column index of agent position in pathfinding world
+            flag (tuple of ints):  The tuple of row and column indexes representing the position of flag
+                                    in pathfinding world
+            pathfinding_world (list of lists / matrix): Shared knowledge base matrix
+            all_enemys (list of tuples):  List of tuples represented as positions of all enemies
+                                            detected and stored in knowledge base
+
+        Returns:
+            action (str) : "move" as an indicator for agent to move
+            direction (str) : "up","down","left" or "right" for the direction to move towards the flag
+        """
         flag_row = flag[0]
         flag_col = flag[1]
         waypoints = [(flag_row-1, flag_col-1), (flag_row+1, flag_col-1), (flag_row+1, flag_col+1), (flag_row-1, flag_col+1)]
@@ -117,6 +194,23 @@ class Agent:
         return action, direction
 
     def search(self, agent_pos_row, agent_pos_col, pathfinding_world, all_enemys):
+        """
+        Function that searches the equivalent target for agent to reach. If the enemy flag is not yet discovered
+        the targets are Top and Down corners of the other side of map. The function calculates the path to them and
+        guides the agent. If the corners are reached, it marks them as visited and searches for a random position on the
+        other side of map where the agents need to go. This increases their probability of discovering the enemy flag. 
+
+        Args:
+            agent_pos_row (int): Row index of agent position in pathfinding world
+            agent_pos_col (int): Column index of agent position in pathfinding world
+            pathfinding_world (list of lists / matrix): Shared knowledge base matrix
+            all_enemys (list of tuples):  List of tuples represented as positions of all enemies
+                                            detected and stored in knowledge base
+
+        Returns:
+            action (str) : "move" as an indicator for agent to move
+            direction (str) : "up","down","left" or "right" for the direction to move towards the next step in generated path
+        """
         action, direction = None, None
         if (agent_pos_row, agent_pos_col) == DOWN_CORNER:
             self.down_corner_visited = True
@@ -132,12 +226,17 @@ class Agent:
                 direction = pathfinding_direction((agent_pos_row, agent_pos_col), self.waypoint, pathfinding_world, all_enemys)
                 if (agent_pos_row, agent_pos_col) == self.waypoint or direction == None:
                     self.waypoint = None
-            else:
+            elif self.random_position_counter < 10:
                 while direction == None:
                     row, col = random_left_middle_position()
                     self.waypoint = (row, col)
                     action = "move"
                     direction = pathfinding_direction((agent_pos_row, agent_pos_col), self.waypoint, pathfinding_world, all_enemys)
+                self.random_position_counter += 1
+            else:
+                action = "move"
+                direction = pathfinding_direction((agent_pos_row, agent_pos_col), UP_CORNER, pathfinding_world, all_enemys)
+                self.random_position_counter = 0
 
         if self.index == 2:
             if not self.up_corner_visited:
@@ -148,22 +247,57 @@ class Agent:
                 direction = pathfinding_direction((agent_pos_row, agent_pos_col), self.waypoint, pathfinding_world, all_enemys)
                 if (agent_pos_row, agent_pos_col) == self.waypoint or direction == None:
                     self.waypoint = None
-            else:
+            elif self.random_position_counter < 10:
                 while direction == None:
                     row, col = random_left_middle_position()
                     self.waypoint = (row, col)
                     action = "move"
                     direction = pathfinding_direction((agent_pos_row, agent_pos_col), self.waypoint, pathfinding_world, all_enemys)
+                self.random_position_counter += 1
+            else:
+                action = "move"
+                direction = pathfinding_direction((agent_pos_row, agent_pos_col), DOWN_CORNER, pathfinding_world, all_enemys)
+                self.random_position_counter = 0
 
         return action, direction
 
     def go_to_position(self, agent_pos_row, agent_pos_col, position, pathfinding_world, all_enemys):
+        """
+        Moves the agent to the next position according to the direction of the calculated path to the flag
+
+        Args:
+            agent_pos_row (int): Row index of agent position in pathfinding world
+            agent_pos_col (int): Column index of agent position in pathfinding world
+            flag (tuple of ints):  The tuple of row and column indexes representing the position of flag
+                                    in pathfinding world
+            pathfinding_world ( list of lists / matrix): Shared knowledge base matrix
+            all_enemys (list of tuples):  List of tuples represented as positions of all enemies
+                                            detected and stored in knowledge base
+
+        Returns:
+            action (str) : "move" as an indicator for agent to move
+            direction (str) : "up","down","left" or "right" for the direction to move towards the path to flag
+        """
         direction = pathfinding_direction((agent_pos_row, agent_pos_col), position, pathfinding_world, all_enemys)
         action = "move"
         return action, direction
     
     # called every "agent frame"
     def update(self, visible_world, position, can_shoot, holding_flag):
+        """
+        Function that is called every frame. It updates the variables and calls the functions for agents holding the
+        flag, finding the path to corners and flags, shooting , dodging, defending and moving.
+
+        Args:
+            visible_world (list of lists, matrix ): the world as the agents sees it. 9x9 square around him
+            position (tuple of ints ): position of the agent in pathfinding world
+            can_shoot (bool): True if the delay for shooting has counted down, False otherwise
+            holding_flag (bool): True if the agent is holding the enemy flag, False otherwise 
+
+        Returns:
+            action (str) : "move" or "shoot" as an indicator for agent on what to do
+            direction (str) : "up","down","left" or "right" for the direction that the agent is going to face 
+        """
         global FRAME
         FRAME += 1
         agent_pos_row = position[1]
@@ -214,12 +348,12 @@ class Agent:
         wait_for_enemy_action = knowlage_base.holding_flag and not self.holding_flag and flage_in_danger_action
 
         # AGENT 0 - DEFENDER
-        if self.index == 0:
-            
+        if self.index == 0:         
+            '''
             print("\n===========================\n")
             for row in knowlage_base.knowlage_base:
                 print(" " + " ".join(row))
-
+            '''
             if defender_attack_action:
                 knowlage_base.update_agent_action(self.index, "defender_attack_action")
                 action, direction = self.go_to_position(agent_pos_row, agent_pos_col, enemy_flag, pathfinding_world, all_enemys)
@@ -325,6 +459,13 @@ class Agent:
             print(self.color, self.index, "died")
 
 def random_left_middle_position():
+    """
+    Calculates a random position on the other side of map for where the agents need to go after they reach corners
+
+    Returns:
+        random_row (int): index for row in pathfinding world
+        random_col (int): index for column in pathfinding world
+    """
     # Defining the left middle part
     # Horizontal: Left half of the matrix
     col_start = WIDTH // 2

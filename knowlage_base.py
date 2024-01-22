@@ -33,6 +33,13 @@ class KnowlageBase:
         self.regrup_radius = 10
 
     def update_agent_action(self, agent, action):
+        """
+        Setter function for agent action
+
+        Args:
+            agent ( int ): index of the agent
+            action ( string ): action that the agent should do (for exp. "move", "shoot")
+        """
         match agent:
             case 0:
                 self.agent0_action = action
@@ -42,6 +49,15 @@ class KnowlageBase:
                 self.agent2_action = action
 
     def get_agent_action(self, agent):
+        """
+        Getter function of agents action
+
+        Args:
+            agent ( Agent class ): agent instance
+
+        Returns:
+            action : the action that agent is currently doing
+        """
         match agent:
             case 0:
                 return self.agent0_action
@@ -51,6 +67,14 @@ class KnowlageBase:
                 return self.agent2_action
 
     def agent_died(self, agent):
+        """
+        Functions that changes the important variables if agent is killed. If the defending agent dies, 
+        changes the defending indicator and sets the indicator for flag in danger. If offensive agents die,
+        updates the attack agent as dead.
+
+        Args:
+            agent ( int ): index of the agent
+        """
         match agent:
             case 0:
                 self.defend_agent = False
@@ -61,6 +85,12 @@ class KnowlageBase:
                 self.attack_agent2 = False
 
     def at_positon(self, agent):
+        """
+        Functions that counts the agents at the target position and demands the regroup
+
+        Args:
+            agent ( int ): index of the agent
+        """
         if agent == 1:
             self.agent1_at_position = True
         elif agent == 2:
@@ -72,10 +102,16 @@ class KnowlageBase:
             self.agent2_at_position = False
 
     def enable_flag_return(self):
+        """
+        If the flag is missing from the position, set it's original position as passable
+        """
         self.pathfinding_world[self.friendly_flag_location[0]][self.friendly_flag_location[1]] = 0
         print("return enabled")
 
     def refresh_enemys(self):
+        """
+        Refreshes the positions of enemies that have moved since the last scan
+        """
         enemys = []
         for row in range(len(self.knowlage_base)):
             for col in range(len(self.knowlage_base[row])):
@@ -101,6 +137,14 @@ class KnowlageBase:
                 self.pathfinding_world[i][enemy_col] = 0
 
     def find_dangerous_location(self, agent_pos_row, agent_pos_col):
+        """
+        Scans the knowledge base for enemies and marks them as dangerous locations for agent
+        to avoid and appends them in variable dangerous_locations and pathfinding_world
+
+        Args:
+            agent_pos_row ( int ): row index of agent's position
+            agent_pos_col ( int ): column index of agent's position
+        """
         enemys = []
         for i in range(max(0, agent_pos_row - 4), min(len(self.knowlage_base), agent_pos_row + 5)):
             for j in range(max(0, agent_pos_col - 4), min(len(self.knowlage_base[0]), agent_pos_col + 5)):
@@ -123,6 +167,16 @@ class KnowlageBase:
                 self.pathfinding_world[i][enemy_col] = 2
 
     def update_general_knowlage_base(self, visible_range, agent_pos_row, agent_pos_col, current_vision):
+        """
+        Updates the knowledge base and sets the score of tiles for the pathfinding algorithm to find the
+        best path. It updates the changing tiles such as "/" when they are discovered.
+
+        Args:
+            visible_range ( int ): number of tiles visible in each direction 
+            agent_pos_row ( int ): row index of agent's position
+            agent_pos_col ( int ): column index of agent's position
+            current_vision ( list of lists / matrix ): the world as the agents sees it. 9x9 square around him
+        """
         for row_offset in range(-visible_range, visible_range+1):
             for col_offset in range(-visible_range, visible_range+1):
                 if 0 <= agent_pos_row + row_offset < HEIGHT\
@@ -133,11 +187,11 @@ class KnowlageBase:
                         self.knowlage_base[row][col] = current_vision[current_vision_row][current_vision_col]
                         if current_vision[current_vision_row][current_vision_col] == self.enemy[0]:
                             self.all_enemy_location.append((row, col))
-                            
+
                         #      -1 -> unknown (/)
                         #       0 -> empty space (" ")
                         #       1 -> obstacle (#)
-                        #       2 -> mud (enemy)
+                        #       2 -> enemy
                         if current_vision[current_vision_row][current_vision_col] in [" ", self.enemy[1], self.friend[0], self.friend[1], self.enemy_flag]:
                             self.pathfinding_world[row][col] = 0
                         elif current_vision[current_vision_row][current_vision_col] == "#":
@@ -159,6 +213,12 @@ class KnowlageBase:
                                     self.reserve_regrup_spot = (row, col)
 
     def find_regrup_spot(self, flag):
+        """
+        Function that is searching for a position where offensive agents will regroup after reaching target
+
+        Args:
+            flag ( tupple of ints ) - position (x and y coords on map) where the flag is
+        """
         self.regrup_spot = self.reserve_regrup_spot
         center_x = flag[0]
         center_y = flag[1]
@@ -182,6 +242,16 @@ class KnowlageBase:
                             break
 
     def enemy_locations(self, agent_pos_row, agent_pos_col):
+        """
+        Scans the row or column for the discovered enemy for agent to dodge it.
+
+        Args:
+            agent_pos_row ( int ): row index of agent's position
+            agent_pos_col ( int ): column index of agent's position
+
+        Returns:
+            indices ( list ): list of positions of discovered bullets
+        """
         indices = []
 
         # Check the same row within 4 columns of the agent
@@ -199,6 +269,16 @@ class KnowlageBase:
         return indices
     
     def bullet_locations(self, agent_pos_row, agent_pos_col):
+        """
+        Scans the row or column for the discovered bullet for agent to dodge it.
+
+        Args:
+            agent_pos_row ( int ): row index of agent's position
+            agent_pos_col ( int ): column index of agent's position
+
+        Returns:
+            indices ( list ): list of positions of discovered bullets
+        """
         indices = []
 
         # Check the same row within 4 columns of the agent

@@ -1,13 +1,11 @@
 import heapq
 import math 
 
-
 EMPTY_STEP_COST = 1
 MUD_STEP_COST = 10 # 10
 FEAR_OF_UNKNOWN = 6.66
 UNKNOWN_STEP_COST = max(EMPTY_STEP_COST, MUD_STEP_COST) * FEAR_OF_UNKNOWN  # for unknown positions (not visible)
 FEAR_OF_ENEMY = 10
-
 
 # Function to find the shortest path from agent_pos to target_pos on the given grid,
 #   and return direction in which the agent should move
@@ -20,7 +18,7 @@ def pathfinding_direction(agent_pos, target_pos, grid, enemy_pos = (None, None))
     #      -1 -> unknown (/)
     #       0 -> empty space (" ")
     #       1 -> obstacle (#)
-    #       2 -> mud (enemy)
+    #       2 -> enemy
     # return: direction, shortest_path
     #   direction: direction in which the agent will move, such as 'RIGHT', 'LEFT', 'UP', or 'DOWN'
     #   shortest_path: a list of coordinates (tuples) for visualization of the path, such as [(1, 3), (2, 3), ...]
@@ -87,7 +85,6 @@ def astar(agent_pos, target_pos, enemy_pos, grid):
                     Update the parent of the neighbor.
                         Hint: `came_from`
     '''
-    # YOUR CODE HERE
     while open_set:
        current_cost, current = heapq.heappop(open_set)
 
@@ -128,7 +125,6 @@ def reconstruct_path(came_from, start, target):
     Create the path by traversing positions backwards from target until you reach the start position.
     Return the reversed path (to get the correct order).
     '''
-    #pass # YOUR CODE HERE
     current = target
     path = []
     if target not in came_from:
@@ -150,7 +146,6 @@ def is_valid(pos, grid):
 
 # Estimate the cost from position 'a' to position 'b' using the euclidian distance:
 def heuristic(a, b):
-    #pass # YOUR CODE HERE
     return math.dist(a, b)
 
 
@@ -160,18 +155,3 @@ def fear_of_enemy(current, enemy):
         return 0
     multiplier = FEAR_OF_ENEMY / ((dist + 1))
     return  multiplier * FEAR_OF_ENEMY *1000
-
-
-# Copy the rest of your previous pathfinding code here (from pathfinding_agent.py)
-
-'''
-In this implementation:
-   - Optimize path directness:
-        Enhance the heuristic function to encourage the agent to choose more direct paths (replace manhattan distance).
-   - Prefer clean paths:
-        Modify the algorithm to prioritize paths with fewer muddy positions.
-   - Favor explored positions:
-        Adjust the algorithm to give preference to positions that have already been explored.
-   - Avoid the enemy:
-        Adjust the cost calculation so the agent avoids the enemy.
-'''
